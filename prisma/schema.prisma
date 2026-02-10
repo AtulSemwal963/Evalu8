@@ -1,0 +1,214 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_CONNECTION_STRING")
+}
+
+// User model for authentication and user management
+model User {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  email         String   @unique
+  name          String?
+  avatar        String?
+  role          String   @default("user") // user, admin, instructor
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  assessments   Assessment[]
+  attempts      Attempt[]
+  templates     Template[]
+  auditLogs     AuditLog[]
+}
+
+// Main Assessment model
+model Assessment {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  filename        String   @default("Untitled Assessment")
+  description     String?
+  status          String   @default("draft") // draft, published
+  type            String   // mcq, reordering, hotspot, mix
+  mode            String   // formative, summative
+  subject         String?
+  duration        Int      @default(45) // in minutes
+  instructions    String?
+  questionCount   Int      @default(0)
+  difficulty      String   @default("medium") // easy, medium, hard
+  bloomLevel      String?  // remember, understand, apply, analyze, evaluate, create
+  learningObjective String?
+  
+  // Settings
+  timerEnabled    Boolean  @default(true)
+  allowNavigation  Boolean  @default(true)
+  showResults      Boolean  @default(true)
+  passingScore    Int      @default(70)
+  allowRetakes    Boolean  @default(false)
+  maxRetries      Int      @default(3)
+  showFeedback    Boolean  @default(true)
+  randomizeQuestions Boolean @default(false)
+  
+  // Metadata
+  isPublished     Boolean  @default(false)
+  isTemplate      Boolean  @default(false)
+  tags            String[] // Array of tags for categorization
+  
+  // Relations
+  authorId        String   @db.ObjectId
+  author          User     @relation(fields: [authorId], references: [id])
+  questions       Question[]
+  attempts        Attempt[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Polymorphic Question model that handles all question types
+model Question {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  type                 String   // mcq, reordering, hotspot
+  stem                 String
+  order                Int      @default(0) // For question ordering
+  
+  // MCQ specific fields
+  options               String[] // Array of option texts
+  correctAnswers        String[] // Array of correct answer indices (a, b, c, d)
+  explanation           String?
+  allowMultipleAnswers  Boolean  @default(false)
+  distractorFeedback    Json?    // Feedback for each option
+  
+  // Reordering specific fields
+  items                 Json?    // Array of {id, text} objects for ordering
+  correctOrder          String[] // For validation
+  orderingInstructions  String?
+  
+  // Hotspot specific fields
+  zones                 Json?    // Array of {id, x, y, width, height} objects
+  imageUrl              String?
+  imageAlt              String?
+  hotspotInstructions   String?
+  
+  // Common metadata
+  bloomLevel            String?  @default("understand")
+  difficulty            String   @default("medium")
+  points                Int      @default(1)
+  timeLimit            Int?     // Optional time limit per question (seconds)
+  tags                 String[] // Question-specific tags
+  
+  // Relations
+  assessmentId         String   @db.ObjectId
+  assessment           Assessment @relation(fields: [assessmentId], references: [id])
+  responses            Response[]
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+// User attempt tracking
+model Attempt {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  score           Int      @default(0)
+  maxScore        Int      @default(0)
+  percentage      Float    @default(0)
+  passed          Boolean  @default(false)
+  timeSpent       Int      @default(0) // in seconds
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  
+  // Relations
+  assessmentId    String   @db.ObjectId
+  assessment      Assessment @relation(fields: [assessmentId], references: [id])
+  userId          String   @db.ObjectId
+  user            User     @relation(fields: [userId], references: [id])
+  responses       Response[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Individual question responses within an attempt
+model Response {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  questionId      String   @db.ObjectId
+  question        Question @relation(fields: [questionId], references: [id])
+  
+  // Response data (polymorphic based on question type)
+  selectedAnswers String[] // For MCQ - array of selected option indices
+  orderedItems    Json?     // For Reordering - array of item IDs in user's order
+  selectedZones   Json?     // For Hotspot - array of selected zone coordinates
+  
+  isCorrect       Boolean  @default(false)
+  score           Int      @default(0)
+  timeSpent       Int      @default(0) // in seconds
+  feedback        String?
+  
+  // Relations
+  attemptId       String   @db.ObjectId
+  attempt         Attempt @relation(fields: [attemptId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Assessment templates for quick creation
+model Template {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  description     String?
+  category        String
+  difficulty      String   @default("medium")
+  questionCount   Int
+  estimatedTime   Int      // in minutes
+  tags            String[]
+  
+  // Template structure (similar to Assessment but read-only)
+  structure       Json     // Contains question templates and structure
+  
+  isPublic        Boolean  @default(false)
+  usageCount      Int      @default(0)
+  
+  createdBy       String   @db.ObjectId
+  creator         User     @relation(fields: [createdBy], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// System configuration and settings
+model Settings {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  key             String   @unique
+  value           Json     // Flexible value storage
+  description     String?
+  category        String   @default("general")
+  isPublic        Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Audit log for tracking changes
+model AuditLog {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  action          String   // create, update, delete, publish, etc.
+  entityType      String   // assessment, question, user, etc.
+  entityId        String   @db.ObjectId
+  entityName      String?
+  changes         Json?    // Before/after values
+  reason          String?
+  
+  userId          String   @db.ObjectId
+  user            User     @relation(fields: [userId], references: [id])
+  
+  ipAddress       String?
+  userAgent       String?
+  
+  createdAt       DateTime @default(now())
+}
