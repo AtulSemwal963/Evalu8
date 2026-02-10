@@ -439,7 +439,14 @@ GOAL: Helpful, clear, and concise explanation.`
       <div className="grid grid-cols-3 gap-3 pt-2">
         <div className="space-y-1">
           <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Cognitive Depth</Label>
-          <Select value={bloomLevel} onValueChange={setBloomLevel}>
+          <Select
+            value={bloomLevel}
+            onValueChange={(val) => {
+              if (val !== bloomLevel) {
+                setBloomLevel(val)
+              }
+            }}
+          >
             <SelectTrigger className="h-8 text-[11px] font-medium border-slate-100 bg-slate-50/50">
               <SelectValue />
             </SelectTrigger>
@@ -455,7 +462,14 @@ GOAL: Helpful, clear, and concise explanation.`
         </div>
         <div className="space-y-1">
           <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Difficulty</Label>
-          <Select value={initialDifficulty} onValueChange={setDifficulty}>
+          <Select
+            value={initialDifficulty}
+            onValueChange={(val) => {
+              if (val !== initialDifficulty) {
+                setDifficulty(val)
+              }
+            }}
+          >
             <SelectTrigger className="h-8 text-[11px] font-medium border-slate-100 bg-slate-50/50">
               <SelectValue />
             </SelectTrigger>

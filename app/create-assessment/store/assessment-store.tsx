@@ -1,14 +1,14 @@
 "use client"
 
-import { createContext, useContext, useReducer, ReactNode, useEffect } from 'react'
+import { createContext, useContext, useReducer, ReactNode, useCallback } from 'react'
 
 // Assessment State Types
 interface AssessmentDetails {
-  id?: string // Database ID for updates
+  id?: string
   title: string
-  filename: string
+  filename?: string
   description: string
-  status: 'draft' | 'published'
+  status?: string
   subject: string
   duration: number
   instructions: string
@@ -57,13 +57,14 @@ type AssessmentAction =
   | { type: 'UPDATE_QUESTION'; payload: { id: string; question: Partial<Question> } }
   | { type: 'REMOVE_QUESTION'; payload: string }
   | { type: 'UPDATE_DRAFT'; payload: Partial<Question> }
+  | { type: 'HYDRATE_ASSESSMENT'; payload: { assessmentDetails: Partial<AssessmentDetails>; questions: Question[] } }
   | { type: 'RESET_ASSESSMENT' }
-  | { type: 'INITIALIZE'; payload: AssessmentState }
 
 // Initial State
 const initialAssessmentDetails: AssessmentDetails = {
+  id: undefined,
   title: "",
-  filename: "Untitled Assessment",
+  filename: "",
   description: "",
   status: "draft",
   subject: "",
@@ -120,6 +121,15 @@ function assessmentReducer(state: AssessmentState, action: AssessmentAction): As
           ...action.payload
         }
       }
+    case 'HYDRATE_ASSESSMENT':
+      return {
+        ...state,
+        assessmentDetails: {
+          ...state.assessmentDetails,
+          ...action.payload.assessmentDetails
+        },
+        questions: action.payload.questions
+      }
     case 'ADD_QUESTION':
       return {
         ...state,
@@ -148,10 +158,7 @@ function assessmentReducer(state: AssessmentState, action: AssessmentAction): As
         }
       }
     case 'RESET_ASSESSMENT':
-      localStorage.removeItem('evalu8-assessment-cache')
       return initialState
-    case 'INITIALIZE':
-      return action.payload
     default:
       return state
   }
@@ -166,26 +173,6 @@ const AssessmentContext = createContext<{
 // Provider
 export function AssessmentProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(assessmentReducer, initialState)
-
-  // Load from cache on mount
-  useEffect(() => {
-    const cache = localStorage.getItem('evalu8-assessment-cache')
-    if (cache) {
-      try {
-        const parsedCache = JSON.parse(cache)
-        dispatch({ type: 'INITIALIZE', payload: parsedCache })
-      } catch (e) {
-        console.error("Failed to parse assessment cache", e)
-      }
-    }
-  }, [])
-
-  // Sync to cache on any change
-  useEffect(() => {
-    if (state !== initialState) {
-      localStorage.setItem('evalu8-assessment-cache', JSON.stringify(state))
-    }
-  }, [state])
 
   return (
     <AssessmentContext.Provider value={{ state, dispatch }}>
@@ -228,6 +215,8 @@ export function useAssessmentActions() {
   return {
     updateAssessmentDetails: (details: Partial<AssessmentDetails>) =>
       dispatch({ type: 'UPDATE_DETAILS', payload: details }),
+    hydrateAssessment: (payload: { assessmentDetails: Partial<AssessmentDetails>; questions: Question[] }) =>
+      dispatch({ type: 'HYDRATE_ASSESSMENT', payload }),
     addQuestion: (question: Question) =>
       dispatch({ type: 'ADD_QUESTION', payload: question }),
     updateQuestion: (id: string, question: Partial<Question>) =>
@@ -239,6 +228,140 @@ export function useAssessmentActions() {
     resetAssessment: () =>
       dispatch({ type: 'RESET_ASSESSMENT' }),
   }
+}
+
+export function useLoadAssessmentById() {
+  const context = useContext(AssessmentContext)
+  if (!context) {
+    throw new Error('useLoadAssessmentById must be used within AssessmentProvider')
+  }
+
+  const { dispatch } = context
+
+  return useCallback(async (assessmentId: string) => {
+    const response = await fetch(`/api/assessment?id=${assessmentId}`)
+    const data = await response.json()
+
+    if (!response.ok) {
+      const message = data?.error || 'Failed to fetch assessment'
+      throw new Error(message)
+    }
+
+    const assessment = data?.assessment
+    if (!assessment) {
+      throw new Error('Assessment not found')
+    }
+
+    const mappedQuestions: Question[] = (assessment.questions || []).map((q: any) => ({
+      id: q.id,
+      type: q.type,
+      stem: q.stem,
+      timestamp: new Date().toISOString(),
+      options: q.options || [],
+      correctAnswers: q.correctAnswers || [],
+      explanation: q.explanation || '',
+      allowMultipleAnswers: q.allowMultipleAnswers || false,
+      items: q.items || [],
+      instructions: q.orderingInstructions || q.hotspotInstructions || '',
+      zones: q.zones || [],
+      imageUrl: q.imageUrl || '',
+      correctOrder: q.correctOrder || [],
+      bloomLevel: q.bloomLevel || 'understand',
+      difficulty: q.difficulty || 'medium',
+      distractorFeedback: q.distractorFeedback || {}
+    }))
+
+    dispatch({
+      type: 'HYDRATE_ASSESSMENT',
+      payload: {
+        assessmentDetails: {
+          id: assessment.id,
+          title: assessment.title || '',
+          filename: assessment.filename || '',
+          description: assessment.description || '',
+          status: assessment.status || 'draft',
+          subject: assessment.subject || '',
+          duration: assessment.duration || 45,
+          instructions: assessment.instructions || '',
+          type: assessment.type || 'mcq',
+          mode: assessment.mode || 'formative',
+          questionCount: assessment.questionCount ?? mappedQuestions.length,
+          timeLimit: assessment.duration || 45,
+          difficulty: assessment.difficulty || 'medium',
+          learningObjective: assessment.learningObjective || '',
+          bloomLevel: assessment.bloomLevel || '',
+          passingScore: assessment.passingScore ?? 70,
+          allowRetakes: assessment.allowRetakes ?? false,
+          maxRetakes: assessment.maxRetries ?? 3,
+          showFeedback: assessment.showFeedback ?? true,
+          randomizeQuestions: assessment.randomizeQuestions ?? false,
+        },
+        questions: mappedQuestions
+      }
+    })
+
+    return assessment
+  }, [dispatch])
+}
+
+export function useSaveAssessment() {
+  const context = useContext(AssessmentContext)
+  if (!context) {
+    throw new Error('useSaveAssessment must be used within AssessmentProvider')
+  }
+
+  const { state, dispatch } = context
+
+  const resolveUserId = useCallback(async () => {
+    const savedUser = localStorage.getItem('evalu8_user')
+    if (!savedUser) throw new Error('User not found in localStorage')
+    const userData = JSON.parse(savedUser)
+    if (!userData?.email) throw new Error('User email not found')
+
+    const userResponse = await fetch(`/api/user?email=${encodeURIComponent(userData.email)}`)
+    const userFromDb = await userResponse.json()
+    if (!userResponse.ok || !userFromDb?.id) {
+      throw new Error(userFromDb?.error || 'Failed to resolve user id')
+    }
+    return userFromDb.id as string
+  }, [])
+
+  const saveWithStatus = useCallback(async (status: 'draft' | 'published') => {
+    const userId = await resolveUserId()
+
+    const payloadAssessmentDetails = {
+      ...state.assessmentDetails,
+      status,
+    }
+
+    const response = await fetch('/api/assessment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        assessmentDetails: payloadAssessmentDetails,
+        questions: state.questions,
+        userId
+      })
+    })
+
+    const data = await response.json()
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.error || 'Failed to save assessment')
+    }
+
+    if (data?.assessmentId) {
+      dispatch({ type: 'UPDATE_DETAILS', payload: { id: data.assessmentId, status } })
+    } else {
+      dispatch({ type: 'UPDATE_DETAILS', payload: { status } })
+    }
+
+    return data.assessmentId as string
+  }, [dispatch, resolveUserId, state.assessmentDetails, state.questions])
+
+  const saveDraft = useCallback(() => saveWithStatus('draft'), [saveWithStatus])
+  const publish = useCallback(() => saveWithStatus('published'), [saveWithStatus])
+
+  return { saveDraft, publish }
 }
 
 export function useDraftQuestion() {

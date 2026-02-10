@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -45,15 +45,27 @@ export function HotspotQuestion({
   difficulty: initialDifficulty = "medium"
 }: HotspotQuestionProps) {
 
+  const fixedImageSrc = "/world%20map.PNG"
+
   const [selectedZone, setSelectedZone] = useState<string | null>(null)
   const [isGeneratingInstructions, setIsGeneratingInstructions] = useState(false)
   const [currentDifficulty, setCurrentDifficulty] = useState(initialDifficulty)
   const [showGrid, setShowGrid] = useState(false)
   const [isDrawing, setIsDrawing] = useState(false)
   const [startPos, setStartPos] = useState<{ x: number, y: number } | null>(null)
+  const [renderImageSrc, setRenderImageSrc] = useState<string>(fixedImageSrc)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (imageUrl !== fixedImageSrc) {
+      setImageUrl(fixedImageSrc)
+    }
+    if (renderImageSrc !== fixedImageSrc) {
+      setRenderImageSrc(fixedImageSrc)
+    }
+  }, [fixedImageSrc, imageUrl, renderImageSrc, setImageUrl])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -268,7 +280,7 @@ GOAL: Clear, student-friendly instructions.`
           {imageUrl ? (
             <>
               <img
-                src={imageUrl}
+                src={renderImageSrc}
                 alt={imageAlt}
                 className="absolute inset-0 w-full h-full object-contain pointer-events-none"
               />
@@ -408,7 +420,14 @@ GOAL: Clear, student-friendly instructions.`
       <div className="grid grid-cols-2 gap-3 pt-2">
         <div className="space-y-1">
           <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Level</Label>
-          <Select value={currentDifficulty} onValueChange={setCurrentDifficulty}>
+          <Select
+            value={currentDifficulty}
+            onValueChange={(val) => {
+              if (val !== currentDifficulty) {
+                setCurrentDifficulty(val)
+              }
+            }}
+          >
             <SelectTrigger className="h-8 text-[11px] font-medium border-slate-100 bg-slate-50/50">
               <SelectValue />
             </SelectTrigger>

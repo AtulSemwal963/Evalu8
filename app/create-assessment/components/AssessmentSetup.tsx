@@ -29,6 +29,9 @@ export function AssessmentSetup() {
   const assessmentDetails = useAssessmentDetails()
   const { updateAssessmentDetails } = useAssessmentActions()
 
+  const difficultyValue = assessmentDetails.difficulty ? assessmentDetails.difficulty : "__none__"
+  const bloomLevelValue = assessmentDetails.bloomLevel ? assessmentDetails.bloomLevel : "__none__"
+
   return (
     <div className="space-y-6">
       {/* Assessment Mode */}
@@ -110,13 +113,19 @@ export function AssessmentSetup() {
         <div className="space-y-1.5 col-span-2">
           <Label className="text-sm font-semibold text-slate-700">Difficulty Level</Label>
           <Select
-            value={assessmentDetails.difficulty}
-            onValueChange={(value) => updateAssessmentDetails({ difficulty: value })}
+            value={difficultyValue}
+            onValueChange={(value) => {
+              const next = value === "__none__" ? "" : value
+              if (next !== assessmentDetails.difficulty) updateAssessmentDetails({ difficulty: next })
+            }}
           >
             <SelectTrigger className="h-10 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="__none__" disabled>
+                Select difficulty...
+              </SelectItem>
               {difficulties.map((level) => (
                 <SelectItem key={level.value} value={level.value}>
                   {level.label}
@@ -155,13 +164,19 @@ export function AssessmentSetup() {
                 <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter text-rose-500 border-rose-100 bg-rose-50/50">Required</Badge>
               </div>
               <Select
-                value={assessmentDetails.bloomLevel}
-                onValueChange={(value) => updateAssessmentDetails({ bloomLevel: value })}
+                value={bloomLevelValue}
+                onValueChange={(value) => {
+                  const next = value === "__none__" ? "" : value
+                  if (next !== assessmentDetails.bloomLevel) updateAssessmentDetails({ bloomLevel: next })
+                }}
               >
                 <SelectTrigger className={`h-10 text-sm transition-all ${!assessmentDetails.bloomLevel ? 'border-rose-200 bg-rose-50/20' : 'border-slate-200'}`}>
-                  <SelectValue placeholder="Select cognitive depth..." />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__none__" disabled>
+                    Select cognitive depth...
+                  </SelectItem>
                   {bloomLevels.map((level) => (
                     <SelectItem key={level.value} value={level.value}>
                       {level.label}

@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { QuestionPaperPreview } from "../../create-assessment/components/QuestionPaperPreview"
-import { AssessmentProvider, useAssessmentDetails, useQuestions } from "../../create-assessment/store/assessment-store"
+import { AssessmentProvider, useLoadAssessmentById } from "../../create-assessment/store/assessment-store"
 
 // Assessment Mode Content Component
 function AssessmentModeContent({ assessment, assessmentQuestions, timeLeft, isStarted, isCompleted, handleStart, handleComplete, formatTime }: {
@@ -212,45 +212,34 @@ function AssessmentModeWrapper({ assessmentId, children }: {
   const [isStarted, setIsStarted] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  
-  const assessmentDetails = useAssessmentDetails()
-  const questions = useQuestions()
+
+  const loadAssessmentById = useLoadAssessmentById()
 
   // Fetch assessment data
   useEffect(() => {
     const fetchAssessment = async () => {
       try {
-        const response = await fetch(`/api/assessment?id=${assessmentId}`)
-        const data = await response.json()
-
-        if (response.ok && data.assessment) {
-          setAssessment(data.assessment)
-          setTimeLeft(data.assessment.duration * 60) // Convert minutes to seconds
-          
-          // Map database questions to store format
-          const mappedQuestions = data.assessment.questions.map((q: any) => ({
-            id: q.id,
-            type: q.type,
-            stem: q.stem,
-            timestamp: new Date().toISOString(),
-            options: q.options || [],
-            correctAnswers: q.correctAnswers || [],
-            explanation: q.explanation || '',
-            allowMultipleAnswers: q.allowMultipleAnswers || false,
-            items: q.items || [],
-            instructions: q.orderingInstructions || q.hotspotInstructions || '',
-            zones: q.zones || [],
-            imageUrl: q.imageUrl || '',
-            correctOrder: q.correctOrder || [],
-            bloomLevel: q.bloomLevel || 'understand',
-            difficulty: q.difficulty || 'medium',
-            distractorFeedback: q.distractorFeedback || {}
-          }))
-          
-          setAssessmentQuestions(mappedQuestions)
-        } else {
-          console.error('Failed to fetch assessment:', data.error)
-        }
+        const fullAssessment = await loadAssessmentById(assessmentId)
+        setAssessment(fullAssessment)
+        setTimeLeft((fullAssessment.duration || 0) * 60)
+        setAssessmentQuestions((fullAssessment.questions || []).map((q: any) => ({
+          id: q.id,
+          type: q.type,
+          stem: q.stem,
+          timestamp: new Date().toISOString(),
+          options: q.options || [],
+          correctAnswers: q.correctAnswers || [],
+          explanation: q.explanation || '',
+          allowMultipleAnswers: q.allowMultipleAnswers || false,
+          items: q.items || [],
+          instructions: q.orderingInstructions || q.hotspotInstructions || '',
+          zones: q.zones || [],
+          imageUrl: q.imageUrl || '',
+          correctOrder: q.correctOrder || [],
+          bloomLevel: q.bloomLevel || 'understand',
+          difficulty: q.difficulty || 'medium',
+          distractorFeedback: q.distractorFeedback || {}
+        })))
       } catch (error) {
         console.error('Error fetching assessment:', error)
       } finally {
@@ -259,7 +248,7 @@ function AssessmentModeWrapper({ assessmentId, children }: {
     }
 
     fetchAssessment()
-  }, [assessmentId])
+  }, [assessmentId, loadAssessmentById])
 
   // Timer effect
   useEffect(() => {

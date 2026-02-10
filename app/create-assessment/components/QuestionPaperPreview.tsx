@@ -20,6 +20,13 @@ import { Reorder, motion } from "framer-motion"
 export function QuestionPaperPreview() {
   const assessmentDetails = useAssessmentDetails()
   const savedQuestions = useQuestions()
+  const [isClient, setIsClient] = useState(false)
+  const fixedHotspotImageSrc = "/worldMap.png"
+
+  // Ensure client-side rendering for dynamic content
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // State for user answers and submission status
   const [userAnswers, setUserAnswers] = useState<Record<string, any>>({})
@@ -314,9 +321,20 @@ export function QuestionPaperPreview() {
               onMouseUp={handleHotspotMouseUp}
               onMouseLeave={handleHotspotMouseUp}
             >
-              {question.imageUrl ? (
+              {fixedHotspotImageSrc ? (
                 <div className="relative aspect-video">
-                  <img src={question.imageUrl} alt="Hotspot" className="w-full h-full object-cover pointer-events-none" />
+                  <img
+                    src={fixedHotspotImageSrc}
+                    alt="Hotspot"
+                    className="w-full h-full object-cover pointer-events-none"
+                    onError={(e) => {
+                      const img = e.currentTarget
+                      const fallback = "/world%20map.PNG"
+                      if (img.src && !img.src.endsWith(fallback)) {
+                        img.src = fallback
+                      }
+                    }}
+                  />
 
                   {/* User Selection Box */}
                   {userSelection && (
@@ -436,7 +454,7 @@ export function QuestionPaperPreview() {
       <div className="text-center font-serif space-y-6">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold uppercase tracking-tight">
-            {assessmentDetails.title || "ASSESSMENT TITLE"}
+            {isClient ? (assessmentDetails.title || "ASSESSMENT TITLE") : "ASSESSMENT TITLE"}
           </h1>
           <div className="flex flex-col gap-0.5 items-center">
             <div className="w-full h-[2px] bg-slate-900"></div>

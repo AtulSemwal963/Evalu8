@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAssessmentDetails, useAssessmentActions } from "../store/assessment-store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Book, Clock, FileText, GraduationCap } from "lucide-react"
+import { useState } from "react"
 
 const subjects = [
   "Mathematics", "Science", "English", "History", "Geography",
@@ -47,11 +48,15 @@ export function BasicDetails() {
             Subject
           </Label>
           <Select
-            value={assessmentDetails.subject}
-            onValueChange={(value) => updateAssessmentDetails({ subject: value })}
+            value={assessmentDetails.subject || undefined}
+            onValueChange={(value) => {
+              if (value !== assessmentDetails.subject) {
+                updateAssessmentDetails({ subject: value })
+              }
+            }}
           >
             <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="Select..." />
+              <SelectValue placeholder="Select subject..." />
             </SelectTrigger>
             <SelectContent>
               {subjects.map((subj) => (

@@ -444,7 +444,14 @@ GOAL: Helpful, clear, and concise explanation starting with the correct order.`
       <div className="grid grid-cols-2 gap-3 pt-2">
         <div className="space-y-1">
           <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Level</Label>
-          <Select value={currentDifficulty} onValueChange={setCurrentDifficulty}>
+          <Select
+            value={currentDifficulty}
+            onValueChange={(val) => {
+              if (val !== currentDifficulty) {
+                setCurrentDifficulty(val)
+              }
+            }}
+          >
             <SelectTrigger className="h-8 text-[11px] font-medium border-slate-100 bg-slate-50/50">
               <SelectValue />
             </SelectTrigger>

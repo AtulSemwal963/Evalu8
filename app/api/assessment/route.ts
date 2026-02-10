@@ -156,6 +156,15 @@ export async function GET(req: Request) {
                         orderBy: {
                             order: 'asc'
                         }
+                    },
+                    author: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            avatar: true,
+                            role: true
+                        }
                     }
                 }
             })

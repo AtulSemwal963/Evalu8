@@ -1,17 +1,17 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Info, ArrowLeft, Save, Eye, Settings, Sparkles, PanelLeftClose, PanelLeftOpen, FileText, Check, Trash2 } from "lucide-react"
+import { Info, ArrowLeft, Save, Eye, Settings, Sparkles, PanelLeftClose, PanelLeftOpen, FileText, Loader2, CheckCircle2, AlertCircle } from "lucide-react"
 import { Plus } from "lucide-react"
-import { useSearchParams } from "next/navigation"
 
 // Import components and provider
-import { AssessmentProvider, useAssessmentDetails, useAssessmentActions, useQuestions } from "./store/assessment-store"
+import { AssessmentProvider, useAssessmentDetails, useAssessmentActions, useLoadAssessmentById, useSaveAssessment } from "./store/assessment-store"
 import { BasicDetails } from "./components/BasicDetails"
 import { AssessmentType } from "./components/AssessmentType"
 import { AssessmentSetup } from "./components/AssessmentSetup"
@@ -23,161 +23,54 @@ import { AIAssistant } from "./components/AIAssistant"
 function CreateAssessmentContent() {
   const [activeTab, setActiveTab] = useState("general")
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [userInitials, setUserInitials] = useState('JD')
-  const [isEditing, setIsEditing] = useState(false)
-  const assessmentDetails = useAssessmentDetails()
-  const questions = useQuestions()
-  const { updateAssessmentDetails, resetAssessment } = useAssessmentActions()
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const searchParams = useSearchParams()
+  const assessmentId = searchParams.get('edit') || searchParams.get('id')
+  const assessmentDetails = useAssessmentDetails()
+  const { updateAssessmentDetails } = useAssessmentActions()
+  const loadAssessmentById = useLoadAssessmentById()
+  const { saveDraft, publish } = useSaveAssessment()
 
-  // Load user data from localStorage
-  useEffect(() => {
-    const savedUser = localStorage.getItem('evalu8_user')
-    if (savedUser) {
-      try {
-        const userData = JSON.parse(savedUser)
-        if (userData.name) {
-          const nameParts = userData.name.trim().split(' ')
-          const initials = nameParts.length > 1
-            ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
-            : nameParts[0][0].toUpperCase()
-          setUserInitials(initials)
-        }
-      } catch (error) {
-        console.error('Error parsing user data:', error)
-      }
-    }
-  }, [])
-
-  // Load assessment data for editing
-  useEffect(() => {
-    const editId = searchParams.get('edit')
-    if (editId) {
-      setIsEditing(true)
-      
-      // Check if we have cached assessment data
-      const cachedAssessment = localStorage.getItem('evalu8-edit-assessment')
-      if (cachedAssessment) {
-        try {
-          const assessment = JSON.parse(cachedAssessment)
-          
-          // Map database data to assessment store format
-          const mappedDetails = {
-            id: assessment.id,
-            title: assessment.title,
-            filename: assessment.filename,
-            description: assessment.description || '',
-            status: assessment.status,
-            subject: assessment.subject || '',
-            duration: assessment.duration,
-            instructions: assessment.instructions || '',
-            type: assessment.type,
-            mode: assessment.mode,
-            questionCount: assessment.questionCount,
-            timeLimit: assessment.duration,
-            difficulty: assessment.difficulty,
-            learningObjective: assessment.learningObjective || '',
-            bloomLevel: assessment.bloomLevel || '',
-            passingScore: assessment.passingScore,
-            allowRetakes: assessment.allowRetakes,
-            maxRetries: assessment.maxRetries,
-            showFeedback: assessment.showFeedback,
-            randomizeQuestions: assessment.randomizeQuestions
-          }
-
-          // Map questions to store format
-          const mappedQuestions = assessment.questions.map((q: any) => ({
-            id: q.id,
-            type: q.type,
-            stem: q.stem,
-            timestamp: new Date().toISOString(),
-            options: q.options || [],
-            correctAnswers: q.correctAnswers || [],
-            explanation: q.explanation || '',
-            allowMultipleAnswers: q.allowMultipleAnswers || false,
-            items: q.items || [],
-            instructions: q.orderingInstructions || q.hotspotInstructions || '',
-            zones: q.zones || [],
-            imageUrl: q.imageUrl || '',
-            correctOrder: q.correctOrder || [],
-            bloomLevel: q.bloomLevel || 'understand',
-            difficulty: q.difficulty || 'medium',
-            distractorFeedback: q.distractorFeedback || {}
-          }))
-
-          // Update the store with loaded data
-          updateAssessmentDetails(mappedDetails)
-          mappedQuestions.forEach((question: any) => {
-            // This will need to be handled by the store
-            console.log('Loading question:', question)
-          })
-
-          // Clear cached data
-          localStorage.removeItem('evalu8-edit-assessment')
-        } catch (error) {
-          console.error('Error parsing cached assessment:', error)
-        }
-      }
-    }
-  }, [searchParams, updateAssessmentDetails])
-
-  const handleSave = async (status: 'draft' | 'published') => {
-    setIsSaving(true)
+  const handleSaveDraft = async () => {
+    if (isSavingDraft || isPublishing) return
+    setIsSavingDraft(true)
+    setSaveMessage(null)
     try {
-      // Get user from localStorage
-      const savedUser = localStorage.getItem('evalu8_user')
-      if (!savedUser) {
-        alert('Please complete onboarding first')
-        return
-      }
-
-      const userData = JSON.parse(savedUser)
-
-      // Get user ID from database
-      const userResponse = await fetch(`/api/user?email=${encodeURIComponent(userData.email)}`)
-      const userDataFromDb = await userResponse.json()
-
-      if (!userDataFromDb.id) {
-        alert('User not found. Please refresh and try again.')
-        return
-      }
-
-      const response = await fetch('/api/assessment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          assessmentDetails: {
-            ...assessmentDetails,
-            status
-          },
-          questions,
-          userId: userDataFromDb.id
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.details || data.error || 'Failed to save')
-      }
-
-      // Store the assessment ID for future updates
-      updateAssessmentDetails({
-        status,
-        id: data.assessmentId
-      })
-
-      alert(data.message || (status === 'published' ? 'Assessment published!' : 'Draft saved!'))
-
-    } catch (error) {
-      console.error('Save error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save'
-      alert(`Error: ${errorMessage}`)
+      await saveDraft()
+      setSaveMessage({ type: 'success', text: 'Draft saved' })
+    } catch (e) {
+      console.error(e)
+      setSaveMessage({ type: 'error', text: 'Failed to save draft' })
     } finally {
-      setIsSaving(false)
+      setIsSavingDraft(false)
+      setTimeout(() => setSaveMessage(null), 2500)
     }
   }
+
+  const handlePublish = async () => {
+    if (isSavingDraft || isPublishing) return
+    setIsPublishing(true)
+    setSaveMessage(null)
+    try {
+      await publish()
+      setSaveMessage({ type: 'success', text: 'Published' })
+    } catch (e) {
+      console.error(e)
+      setSaveMessage({ type: 'error', text: 'Failed to publish' })
+    } finally {
+      setIsPublishing(false)
+      setTimeout(() => setSaveMessage(null), 2500)
+    }
+  }
+
+  useEffect(() => {
+    if (!assessmentId) return
+    loadAssessmentById(assessmentId).catch((e) => {
+      console.error(e)
+    })
+  }, [assessmentId, loadAssessmentById])
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col text-slate-900 overflow-hidden">
@@ -186,7 +79,11 @@ function CreateAssessmentContent() {
       <header className="sticky top-0 z-50 bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 sm:px-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)] shrink-0 font-google">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => window.history.back()}>
-              <img src="/logo.png" alt="Evalu8 Logo" className="w-9 h-9 object-contain" />
+            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200 rotate-3 hover:rotate-0 transition-transform cursor-pointer group">
+                <img src="/logo.png" alt="Evalu8 Logo" className="w-full h-full object-contain" />
+
+            </div>
+            
             <div className="flex flex-col">
               <span className="text-sm font-black tracking-tighter text-slate-900 leading-none">EVALU8</span>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">Design Studio</span>
@@ -214,9 +111,9 @@ function CreateAssessmentContent() {
               </div>
               <input
                 type="text"
-                value={assessmentDetails.filename || ""}
-                placeholder="Assessment Name"
-                onChange={(e) => updateAssessmentDetails({ filename: e.target.value })}
+                value={assessmentDetails.title || ""}
+                placeholder="Untitled Assessment"
+                onChange={(e) => updateAssessmentDetails({ title: e.target.value })}
                 className="bg-transparent border-none text-sm font-bold text-slate-900 hover:bg-slate-100/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-100 rounded-md py-1.5 px-3 transition-all w-full placeholder:text-slate-300"
               />
             </div>
@@ -224,57 +121,54 @@ function CreateAssessmentContent() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Badge
-            variant="outline"
-            className={`text-[10px] font-black uppercase tracking-tighter px-2 h-5 ${assessmentDetails.status === 'published' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-orange-200 bg-orange-50 text-orange-600'}`}
-          >
-            {assessmentDetails.status}
-          </Badge>
-
-          <div className="hidden md:flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-[10px] font-bold text-slate-500 uppercase px-1">Live Sync</span>
-          </div>
-
-          <div className="h-6 w-[1px] bg-slate-200 mx-1"></div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              if (confirm("This will clear all unsaved progress and create a new assessment. Are you sure?")) {
-                resetAssessment()
-              }
-            }}
-            className="h-9 w-9 text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors"
-            title="Create New Assessment"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleSave('draft')}
-            disabled={isSaving}
-            className="text-xs font-bold text-slate-500 hover:text-indigo-600 px-3 flex items-center gap-2"
+            className="text-xs font-bold text-slate-500 hover:text-indigo-600 px-3"
+            onClick={handleSaveDraft}
+            disabled={isSavingDraft || isPublishing}
           >
-            <Save className="h-3.5 w-3.5" />
-            {isSaving ? 'Saving...' : 'Save Draft'}
+            {isSavingDraft ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Draft'
+            )}
           </Button>
 
           <Button
             size="sm"
-            onClick={() => handleSave('published')}
-            disabled={isSaving}
-            className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 rounded-lg shadow-lg shadow-indigo-100 transition-all active:scale-95 flex items-center gap-2"
+            className="h-9 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 rounded-lg shadow-lg shadow-indigo-100 transition-all active:scale-95"
+            onClick={handlePublish}
+            disabled={isSavingDraft || isPublishing}
           >
-            <Check className="h-4 w-4" />
-            {isSaving ? 'Publishing...' : 'Publish'}
+            {isPublishing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Publishing...
+              </>
+            ) : (
+              'Publish'
+            )}
           </Button>
+
+          {saveMessage && (
+            <div className="hidden md:flex items-center gap-1.5 rounded-full border px-2.5 py-1 bg-white">
+              {saveMessage.type === 'success' ? (
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+              ) : (
+                <AlertCircle className="h-3.5 w-3.5 text-rose-600" />
+              )}
+              <span className={`text-[10px] font-bold uppercase ${saveMessage.type === 'success' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {saveMessage.text}
+              </span>
+            </div>
+          )}
 
           <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center cursor-pointer hover:border-indigo-300 transition-colors">
-            <span className="text-[10px] font-bold text-slate-400">{userInitials}</span>
+            <span className="text-[10px] font-bold text-slate-400">JD</span>
           </div>
         </div>
       </header>
@@ -376,9 +270,7 @@ function CreateAssessmentContent() {
 export default function CreateAssessmentPage() {
   return (
     <AssessmentProvider>
-      <Suspense fallback={<div>Loading...</div>}>
-        <CreateAssessmentContent />
-      </Suspense>
+      <CreateAssessmentContent />
     </AssessmentProvider>
   )
 }
