@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -376,7 +376,9 @@ function CreateAssessmentContent() {
 export default function CreateAssessmentPage() {
   return (
     <AssessmentProvider>
-      <CreateAssessmentContent />
+      <Suspense fallback={<div>Loading...</div>}>
+        <CreateAssessmentContent />
+      </Suspense>
     </AssessmentProvider>
   )
 }
