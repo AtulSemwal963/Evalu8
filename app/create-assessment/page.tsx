@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
@@ -20,14 +20,12 @@ import { QuestionPaperPreview } from "./components/QuestionPaperPreview"
 import { QuestionBuilder } from "./components/QuestionBuilderRefactored"
 import { AIAssistant } from "./components/AIAssistant"
 
-function CreateAssessmentContent() {
+function CreateAssessmentContent({ assessmentId }: { assessmentId: string | null }) {
   const [activeTab, setActiveTab] = useState("general")
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const searchParams = useSearchParams()
-  const assessmentId = searchParams.get('edit') || searchParams.get('id')
   const assessmentDetails = useAssessmentDetails()
   const { updateAssessmentDetails } = useAssessmentActions()
   const loadAssessmentById = useLoadAssessmentById()
@@ -267,10 +265,18 @@ function CreateAssessmentContent() {
   )
 }
 
+function CreateAssessmentContentWithSearchParams() {
+  const searchParams = useSearchParams()
+  const assessmentId = searchParams.get('edit') || searchParams.get('id')
+  return <CreateAssessmentContent assessmentId={assessmentId} />
+}
+
 export default function CreateAssessmentPage() {
   return (
     <AssessmentProvider>
-      <CreateAssessmentContent />
+      <Suspense fallback={null}>
+        <CreateAssessmentContentWithSearchParams />
+      </Suspense>
     </AssessmentProvider>
   )
 }
