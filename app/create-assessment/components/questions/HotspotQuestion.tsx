@@ -33,7 +33,7 @@ interface HotspotQuestionProps {
 }
 
 export function HotspotQuestion({
-  imageUrl,
+  imageUrl='/worldMap.png',
   setImageUrl,
   imageAlt,
   setImageAlt,
@@ -45,7 +45,7 @@ export function HotspotQuestion({
   difficulty: initialDifficulty = "medium"
 }: HotspotQuestionProps) {
 
-  const fixedImageSrc = "/world%20map.PNG"
+  const fixedImageSrc = "/worldMap.png"
 
   const [selectedZone, setSelectedZone] = useState<string | null>(null)
   const [isGeneratingInstructions, setIsGeneratingInstructions] = useState(false)
