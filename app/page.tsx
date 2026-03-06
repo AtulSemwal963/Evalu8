@@ -16,7 +16,8 @@ export default function Home() {
     }
   }, [])
 
-  const handleOnboardingComplete = (userData: { name: string; email: string }) => {
+  const handleOnboardingComplete = (userData: { name: string; email: string; profilePicture?: string | null }) => {
+    localStorage.setItem("evalu8_user", JSON.stringify(userData))
     setShowOnboarding(false)
   }
 

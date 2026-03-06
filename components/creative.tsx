@@ -59,6 +59,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { AssessmentSkeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { LogOut, User as UserIcon } from "lucide-react"
 
 // Sample data for question types
 const questionTypes = [
@@ -300,6 +309,11 @@ export function Evalu8Dashboard() {
     return () => clearTimeout(timer)
   }, [])
 
+  const handleSignOut = () => {
+    localStorage.removeItem('evalu8_user')
+    window.location.reload() // Refresh to show onboarding/auth screen
+  }
+
   // Helper function to get icon based on type
   const getTypeIcon = (type: string) => {
     switch (type.toLowerCase()) {
@@ -485,10 +499,40 @@ export function Evalu8Dashboard() {
                 New Assessment
               </a>
 
-              <Avatar className="h-9 w-9 border-2 border-primary">
-                <AvatarImage src="/placeholder.svg?height=40&width=40" alt="User" />
-                <AvatarFallback>{userInitials}</AvatarFallback>
-              </Avatar>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-9 w-9 rounded-full border-2 border-primary p-0">
+                    <Avatar className="h-full w-full">
+                      <AvatarImage src="/placeholder.svg?height=40&width=40" alt="User" />
+                      <AvatarFallback>{userInitials}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56 rounded-2xl" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">Account</p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        Manage your profile
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="rounded-xl cursor-not-allowed opacity-50">
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="rounded-xl cursor-not-allowed opacity-50">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="rounded-xl text-red-600 focus:text-red-600 cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign Out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>

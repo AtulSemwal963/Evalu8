@@ -12,14 +12,22 @@ datasource db {
 
 // User model for authentication and user management
 model User {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  email         String   @unique
-  name          String?
-  avatar        String?
-  role          String   @default("user") // user, admin, instructor
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  email               String   @unique
+  password            String?
+  name                String?
+  profilePicture      String?
+  role                String   @default("user") // student, uniProfessor, sme, corpTrainer, etc.
+  loginMethod         String   @default("email") // email, google, microsoft
+  authToken           String?
+  onboardingResponses Json?    // JSON object storing questionnaire responses
+  isActive            Boolean  @default(true)
+  
+  // Verification field
+  isVerified          Boolean  @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
   
   // Relations
   assessments   Assessment[]
