@@ -4,8 +4,6 @@ import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import sgMail from '@sendgrid/mail';
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY || ''); // Please set your actual key in .env
-
 export async function POST(req: Request) {
     try {
         const { email, password } = await req.json();
@@ -24,6 +22,16 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Email is already registered. Please sign in.' }, { status: 400 });
         }
 
+        const apiKey = process.env.SENDGRID_API_KEY;
+        const fromEmail = process.env.SENDGRID_FROM_EMAIL;
+
+        if (!apiKey || !fromEmail) {
+            console.error('Missing SendGrid configuration on server side.');
+            return NextResponse.json({ error: 'Authentication service configuration error' }, { status: 500 });
+        }
+
+        sgMail.setApiKey(apiKey);
+
         // Generate 6 digit code
         const code = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -35,17 +43,19 @@ export async function POST(req: Request) {
         await redis.set(email, { code, password: hashedPassword }, { ex: 600 });
 
         // Send email via SendGrid
-        if (process.env.SENDGRID_API_KEY) {
+        try {
             const msg = {
                 to: email,
-                from: process.env.SENDGRID_FROM_EMAIL || 'test@example.com', // Must be verified sender in SendGrid
+                from: fromEmail,
                 subject: 'Verify your Evalu8 Account',
                 text: `Your verification code is ${code}`,
                 html: `<strong>Your verification code is ${code}</strong>`,
             };
             await sgMail.send(msg);
-        } else {
-            console.log("No SendGrid key found. Printing code to console instead:", code);
+            console.log(`Verification email sent to ${email}`);
+        } catch (sendError: any) {
+            console.error('SendGrid Error details:', sendError.response?.body || sendError);
+            return NextResponse.json({ error: 'Failed to send verification email' }, { status: 500 });
         }
 
         return NextResponse.json({ success: true, message: 'Verification email sent' });
